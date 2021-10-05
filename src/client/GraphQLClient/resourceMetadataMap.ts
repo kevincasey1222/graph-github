@@ -1,4 +1,9 @@
-import { ResourceMap, ResourceMetadata, GithubResource } from './types';
+import {
+  ResourceMap,
+  ResourceMetadata,
+  GithubResource,
+  ModifiedResourceMap,
+} from './types';
 
 const pageInfo = `pageInfo {
   endCursor
@@ -9,20 +14,19 @@ const pageInfo = `pageInfo {
  * Resource Metadata Map notes
  *
  * The idea is to store GraphQL object structure here so that queries with multiple levels
- * can be spontaneously built from these pieces. Generally, objects do not have a notion of
- * parent - instead, base objects have the notion of children, and our GraphQL query-assembling
- * code can walk that tree to assemble the nested GraphQL query that will be sent to GitHub's API
+ * can be spontaneously built from these pieces. By looking at the children and parent
+ * properties, our GraphQL query-assembling code can walk that tree to assemble the nested
+ * GraphQL query that will be sent to GitHub's API.
  *
- * Base objects often need a string to pin down which object(s) you need. For example, the
- * Organization base object requires a string for the login of the organization. There is
- * sometimes a choice about whether to implement an object as a base object with appropriate
- * parameters to locate it, or as the child of a parent object which locates the child through
- * their relationship.
+ * Note that one can access an object via its parent, or via search parameters passed in the
+ * query. Therefore, there is a choice about whether to access certain objects via parent
+ * relationships or via the query parameters. Obiviously, the tree has to be rooted somewhere,
+ * and whatever that root object is, query parameters will be required to establish it.
  *
- * For example, GithubResource.Organization is implemented here as a base object, and it has children
+ * For example, GithubResource.Organization is implemented here as a root object, and it has children
  * of .OrganizationMembers, .Teams, .TeamMembers, and .Repositories.
  *
- * GithubResource.PullRequests is implemented as a base object, rather than as a child of .Repositories.
+ * GithubResource.PullRequests is implemented as a root object, rather than as a child of .Repositories.
  * Therefore, the appropriate pull requests are found by passing in a string with filters based on
  * pull request type and the repo name. PullRequests has children .Commits, .Reviews, and .Labels.
  * PullRequests could have been implemented as a child object of .Repositories, but it was not because
@@ -142,7 +146,7 @@ export default function (
         }
         ${pageInfo}
       }`,
-      children: [GithubResource.Assignees, GithubResource.LabelsOnIssues],
+      children: [GithubResource.Assignees, ModifiedResourceMap.LabelsOnIssues],
     },
     [GithubResource.Assignees]: {
       graphRequestVariables: [`$${GithubResource.Assignees}: String`],
@@ -159,7 +163,8 @@ export default function (
         }
       }`,
     },
-    [GithubResource.LabelsOnIssues]: {
+    [ModifiedResourceMap.LabelsOnIssues]: {
+      //not using a GithubResource here because we need a different query than the usual GithubResource.Labels
       graphRequestVariables: [`$${GithubResource.Labels}: String`],
       factory: () => `... on Issue {
           ${GithubResource.Labels}(first: ${pageLimit}, after: $${GithubResource.Labels}) {
@@ -242,7 +247,7 @@ export default function (
     },
     [GithubResource.TeamRepositories]: {
       graphRequestVariables: [`$${GithubResource.TeamRepositories}: String`],
-      alternateGraphProperty: GithubResource.Repositories, // Need this alternative graphProperty in order to because still searching for repositories, just under teams
+      alternateGraphProperty: GithubResource.Repositories, // Need this alternative graphProperty because still searching for repositories, just under teams
       factory: (
         children: string = '',
       ) => `${GithubResource.Repositories}(first: ${pageLimit}, after: $${GithubResource.TeamRepositories}) {
@@ -267,6 +272,38 @@ export default function (
           node {
             id
             ...repositoryFields
+            ${children}
+          }
+        }
+        ${pageInfo}
+      }`,
+      children: [GithubResource.Collaborators],
+    },
+    [GithubResource.Collaborators]: {
+      graphRequestVariables: [`$${GithubResource.Collaborators}: String`],
+      factory: (
+        children: string = '',
+      ) => `${GithubResource.Collaborators}(first: ${pageLimit}, after: $${GithubResource.Collaborators}) {
+        edges {
+          node {
+            id
+            login
+            ${children}
+          }
+          permission
+        }
+        ${pageInfo}
+      }`,
+      parent: GithubResource.Repositories,
+    },
+    [ModifiedResourceMap.ReposForCollabs]: {
+      graphRequestVariables: [`$${GithubResource.Repositories}: String`],
+      factory: (
+        children: string = '',
+      ) => `${GithubResource.Repositories}(first: ${pageLimit}, after: $${GithubResource.Repositories}) {
+        edges {
+          node {
+            id
             ${children}
           }
         }

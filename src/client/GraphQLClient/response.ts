@@ -3,6 +3,8 @@ import {
   ResourceMap,
   CursorHierarchy,
   GithubResource,
+  ResourceMapEntry,
+  ModifiedResourceMap,
 } from './types';
 
 export function mapResponseCursorsForQuery(
@@ -72,21 +74,38 @@ export function mapResponseResourcesForQuery(
 }
 
 export function extractSelectedResources(
-  selectedResources: GithubResource[],
+  selectedResources: ResourceMapEntry[],
   resourceMetadataMap: ResourceMap<ResourceMetadata>,
   data: any,
-  base: GithubResource,
+  base: ResourceMapEntry,
 ): {
   resources: ResourceMap<any>;
   cursors: ResourceMap<CursorHierarchy>;
 } {
+  //small hack to account for resourceMetadataMap entries that differ from returned Github resources
+  //better approach - further upstream use an object with "expected resource" and "resouceMapEntry"
+  //as seperate properties
+  selectedResources = selectedResources.map((e) => {
+    if (e === ModifiedResourceMap.LabelsOnIssues) {
+      return GithubResource.Labels;
+    }
+    if (e === ModifiedResourceMap.ReposForCollabs) {
+      return GithubResource.Repositories;
+    }
+    return e;
+  });
+  let realbase = base;
+  if (base === ModifiedResourceMap.ReposForCollabs) {
+    realbase = GithubResource.Repositories;
+  }
+
   const { resources, cursors } = extractSelectedResourceFromData(
     data,
     resourceMetadataMap,
     {},
     {},
     selectedResources,
-    base,
+    realbase,
   );
 
   return {
@@ -100,9 +119,9 @@ function extractSelectedResourceFromData(
   resourceMetadataMap: ResourceMap<ResourceMetadata>,
   resources: ResourceMap<any>,
   cursors: ResourceMap<CursorHierarchy>,
-  selectedResources: GithubResource[],
-  selectedResource: GithubResource,
-  parentResource?: [GithubResource, string],
+  selectedResources: ResourceMapEntry[],
+  selectedResource: ResourceMapEntry,
+  parentResource?: [ResourceMapEntry, string],
   edge?: any,
 ): {
   resources: ResourceMap<any>;

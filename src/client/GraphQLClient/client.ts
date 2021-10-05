@@ -14,6 +14,7 @@ import {
   GithubQueryResponse as QueryResponse,
   GithubResource,
   Node,
+  ResourceMapEntry,
 } from './types';
 import buildGraphQL from './buildGraphQL';
 import {
@@ -91,15 +92,13 @@ export class GitHubGraphQLClient {
       rateLimitConsumed += rateLimit.cost;
 
       for (const pullRequestQueryData of pullRequestResponse.search.edges) {
-        const {
-          resources: pageResources,
-          cursors: innerResourceCursors,
-        } = extractSelectedResources(
-          selectedResources,
-          this.resourceMetadataMap,
-          pullRequestQueryData.node,
-          GithubResource.PullRequests,
-        );
+        const { resources: pageResources, cursors: innerResourceCursors } =
+          extractSelectedResources(
+            selectedResources,
+            this.resourceMetadataMap,
+            pullRequestQueryData.node,
+            GithubResource.PullRequests,
+          );
 
         // Construct the pull request
         const pullRequestResponse: PullRequest = {
@@ -195,7 +194,7 @@ export class GitHubGraphQLClient {
    */
   public async iterateIssues(
     query: string,
-    selectedResources: GithubResource[],
+    selectedResources: GithubResource[] | ResourceMapEntry[],
     iteratee: ResourceIteratee<Issue>,
     limit: number = 100, // This is a temporary limit as a stopgap before we get rolling ingestion working for this integration
   ): Promise<QueryResponse> {
@@ -228,10 +227,6 @@ export class GitHubGraphQLClient {
         'Rate limit response for Issue iteration',
       );
       rateLimitConsumed += rateLimit.cost;
-
-      if (selectedResources[1] == GithubResource.LabelsOnIssues) {
-        selectedResources[1] = GithubResource.Labels; //hack to account for resourceMetadataMap on LabelsForIssues
-      }
 
       for (const issueQueryData of issueResponse.search.edges) {
         const { resources: pageResources } = extractSelectedResources(
@@ -306,26 +301,23 @@ export class GitHubGraphQLClient {
         });
       });
 
+      console.log(JSON.stringify(response, null, 2));
+
       const rateLimit = response.rateLimit;
-      this.logger.info(
-        { rateLimit },
-        'Rate limit response for Pull Request iteration',
-      );
+      this.logger.info({ rateLimit }, 'Rate limit response for iteration');
       rateLimitConsumed += rateLimit.cost;
 
-      const pathToData = this.resourceMetadataMap[baseResource]
-        .pathToDataInGraphQlResponse;
+      const pathToData =
+        this.resourceMetadataMap[baseResource].pathToDataInGraphQlResponse;
       const data = pathToData ? get(response, pathToData) : response;
 
-      const {
-        resources: pageResources,
-        cursors: pageCursors,
-      } = extractSelectedResources(
-        selectedResources,
-        this.resourceMetadataMap,
-        data,
-        baseResource,
-      );
+      const { resources: pageResources, cursors: pageCursors } =
+        extractSelectedResources(
+          selectedResources,
+          this.resourceMetadataMap,
+          data,
+          baseResource,
+        );
 
       resources = this.extractPageResources(pageResources, resources);
       queryCursors = mapResponseCursorsForQuery(pageCursors, queryCursors);

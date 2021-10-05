@@ -9,6 +9,10 @@
  *     message
  *     ...
  *   }
+ *
+ * These names are used to access resourceMetadataMap properties,
+ * and also as strings in the queries themselves.
+ *
  */
 export enum GithubResource {
   Organization = 'organization',
@@ -17,6 +21,7 @@ export enum GithubResource {
   TeamMembers = 'members',
   TeamRepositories = 'teamRepositories',
   Repositories = 'repositories',
+  Collaborators = 'collaborators',
   PullRequests = 'pullRequests',
   PullRequest = 'pullRequest',
   Commits = 'commits',
@@ -24,8 +29,19 @@ export enum GithubResource {
   Reviews = 'reviews',
   Issues = 'issues',
   Assignees = 'assignees',
-  LabelsOnIssues = 'labelsOnIssues',
 }
+
+/**
+ * Other names used to access specific resourceMetadataMap entries,
+ * which may modify the usual default entries for a GithubResource,
+ * but are not GraphQL keywords and should not be used inside the query string
+ */
+export enum ModifiedResourceMap {
+  LabelsOnIssues = 'labelsOnIssues',
+  ReposForCollabs = 'reposForCollabs',
+}
+
+export type ResourceMapEntry = ModifiedResourceMap | GithubResource;
 
 export enum OrgMemberRole {
   Admin = 'ADMIN',
@@ -282,6 +298,12 @@ export interface Issue extends Node {
   labels?: Label[];
 }
 
+export interface Collaborator extends Node {
+  permission: string;
+  login: string;
+  repositories: string; //the id of just one repo, despite the plurality of the entry
+}
+
 export interface GithubSearchResources {
   [GithubResource.Issues]: Issue[];
   [GithubResource.PullRequests]: PullRequest[];
@@ -290,6 +312,7 @@ export interface GithubSearchResources {
   [GithubResource.Labels]: Label[];
   [GithubResource.Reviews]: Review[];
   [GithubResource.Assignees]: Actor[];
+  [GithubResource.Collaborators]: Collaborator[];
 }
 
 export type GithubQueryResponse = {

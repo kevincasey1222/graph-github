@@ -1,4 +1,4 @@
-import { GithubResource } from './client';
+import { ResourceMapEntry } from './client';
 
 export interface ResourceMap<T> {
   [resource: string]: T;
@@ -38,11 +38,11 @@ export interface ResourceMetadata {
    * The resources that are nested within this resource. For example, Team
    * Members is a child of Teams.
    */
-  children?: GithubResource[];
+  children?: ResourceMapEntry[];
   /*
    * The resource that this resource is nested within.
    */
-  parent?: GithubResource;
+  parent?: ResourceMapEntry;
   /*
    * The path to the relevant data when parsing a the graphQL response from its root.
    *

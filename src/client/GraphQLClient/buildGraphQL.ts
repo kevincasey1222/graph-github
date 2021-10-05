@@ -1,14 +1,14 @@
 import {
-  GithubResource,
   QueryHierarchy,
   ResourceMap,
   ResourceMetadata,
+  ResourceMapEntry,
 } from './types';
 
 export default function buildGraphQL(
   resourceMetadataMap: ResourceMap<ResourceMetadata>,
-  parentResource: GithubResource,
-  queryResources: GithubResource[],
+  parentResource: ResourceMapEntry,
+  queryResources: ResourceMapEntry[],
 ): string {
   const queries: QueryHierarchy[] = [];
   const variables: string[] = [];
@@ -38,7 +38,7 @@ export default function buildGraphQL(
 
     const includedChildren = resourceMetadata.children
       ? resourceMetadata.children.reduce(
-          (included: GithubResource[], c: GithubResource) => {
+          (included: ResourceMapEntry[], c: ResourceMapEntry) => {
             if (queryResources.includes(c)) {
               included.push(c);
             }
@@ -49,14 +49,14 @@ export default function buildGraphQL(
       : [];
 
     if (resourceMetadata.children && includedChildren.length > 0) {
-      includedChildren.forEach((c: GithubResource) => {
+      includedChildren.forEach((c: ResourceMapEntry) => {
         if (resourceMetadataMap[c].graphRequestVariables) {
           variables.push(...resourceMetadataMap[c].graphRequestVariables);
         }
       });
       queries.push({
         self: resourceMetadata.factory,
-        children: includedChildren.map((c: GithubResource) => ({
+        children: includedChildren.map((c: ResourceMapEntry) => ({
           self: () => resourceMetadataMap[c].factory(),
           children: [],
         })),

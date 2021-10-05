@@ -14,6 +14,7 @@ import {
   OrgTeamRepoQueryResponse,
   TeamRepositoryPermission,
   GithubResource,
+  ModifiedResourceMap,
 } from './GraphQLClient';
 import {
   RepoCollaboratorQueryResponse,
@@ -34,12 +35,11 @@ import { ResourceIteratee } from '../client';
 import {
   PullRequest,
   Issue,
+  Collaborator,
   GithubQueryResponse as QueryResponse,
 } from './GraphQLClient/types';
 
 export default class OrganizationAccountClient {
-  authorizedForPullRequests: boolean;
-
   v3RateLimitConsumed: number;
   v4RateLimitConsumed: number;
 
@@ -75,7 +75,6 @@ export default class OrganizationAccountClient {
     this.v4 = options.graphqlClient;
     this.logger = options.logger;
 
-    this.authorizedForPullRequests = true;
     this.v3RateLimitConsumed = 0;
     this.v4RateLimitConsumed = 0;
   }
@@ -110,14 +109,12 @@ export default class OrganizationAccountClient {
   async getMembers(): Promise<OrgMemberQueryResponse[]> {
     let response;
     await this.queryGraphQL('members', async () => {
-      const {
-        membersWithRole,
-        rateLimitConsumed,
-      } = await this.v4.fetchFromSingle(
-        GithubResource.Organization,
-        [GithubResource.OrganizationMembers],
-        { login: this.login },
-      );
+      const { membersWithRole, rateLimitConsumed } =
+        await this.v4.fetchFromSingle(
+          GithubResource.Organization,
+          [GithubResource.OrganizationMembers],
+          { login: this.login },
+        );
       response = membersWithRole;
       return rateLimitConsumed;
     });
@@ -127,10 +124,7 @@ export default class OrganizationAccountClient {
   async getTeams(): Promise<OrgTeamQueryResponse[]> {
     let response;
     await this.queryGraphQL('teams', async () => {
-      const {
-        teams,
-        rateLimitConsumed,
-      } = await this.v4.fetchFromSingle(
+      const { teams, rateLimitConsumed } = await this.v4.fetchFromSingle(
         GithubResource.Organization,
         [GithubResource.Teams],
         { login: this.login },
@@ -144,10 +138,7 @@ export default class OrganizationAccountClient {
   async getTeamMembers(): Promise<OrgTeamMemberQueryResponse[]> {
     let response;
     await this.queryGraphQL('team members', async () => {
-      const {
-        members,
-        rateLimitConsumed,
-      } = await this.v4.fetchFromSingle(
+      const { members, rateLimitConsumed } = await this.v4.fetchFromSingle(
         GithubResource.Organization,
         [GithubResource.TeamMembers],
         { login: this.login },
@@ -161,10 +152,7 @@ export default class OrganizationAccountClient {
   async getRepositories(slugs?: string[]): Promise<OrgRepoQueryResponse[]> {
     let response;
     await this.queryGraphQL('repositories', async () => {
-      const {
-        repositories,
-        rateLimitConsumed,
-      } = await this.v4.fetchFromSingle(
+      const { repositories, rateLimitConsumed } = await this.v4.fetchFromSingle(
         GithubResource.Organization,
         [GithubResource.Repositories],
         { login: this.login },
@@ -194,14 +182,12 @@ export default class OrganizationAccountClient {
     let response;
     try {
       await this.queryGraphQL('team repositories', async () => {
-        const {
-          teamRepositories,
-          rateLimitConsumed,
-        } = await this.v4.fetchFromSingle(
-          GithubResource.Organization,
-          [GithubResource.TeamRepositories],
-          { login: this.login },
-        );
+        const { teamRepositories, rateLimitConsumed } =
+          await this.v4.fetchFromSingle(
+            GithubResource.Organization,
+            [GithubResource.TeamRepositories],
+            { login: this.login },
+          );
         response = teamRepositories as OrgTeamRepoQueryResponse[];
         return rateLimitConsumed;
       });
@@ -215,14 +201,27 @@ export default class OrganizationAccountClient {
     return response || [];
   }
 
+  async getCollaborators(): Promise<Collaborator[]> {
+    let response;
+    await this.queryGraphQL('collaborators', async () => {
+      const { repositories, collaborators, rateLimitConsumed } =
+        await this.v4.fetchFromSingle(
+          GithubResource.Organization,
+          [GithubResource.Collaborators],
+          { login: this.login },
+        );
+      console.log(`collabs are ${JSON.stringify(collaborators, null, 2)}`);
+      console.log(`repos are ${JSON.stringify(repositories, null, 2)}`);
+      response = collaborators as Collaborator[];
+      return rateLimitConsumed;
+    });
+    return response || [];
+  }
+
   async iteratePullRequestEntities(
     repo: RepoEntity,
     iteratee: ResourceIteratee<PullRequest>,
   ): Promise<QueryResponse> {
-    if (!this.authorizedForPullRequests) {
-      this.logger.info('Account not authorized for ingesting pull requests.');
-      return { rateLimitConsumed: 0 };
-    }
     const query = `is:pr repo:${repo.fullName}`;
     return await this.v4.iteratePullRequests(
       query,
@@ -238,14 +237,10 @@ export default class OrganizationAccountClient {
     //issues and PRs are actually the same in the API
     //we just filter for is:issue instead of is:pr
     //and remove pr-specific children from the request
-    if (!this.authorizedForPullRequests) {
-      this.logger.info('Account not authorized for ingesting issues.');
-      return { rateLimitConsumed: 0 };
-    }
     const query = `is:issue repo:${repo.fullName}`;
     return await this.v4.iterateIssues(
       query,
-      [GithubResource.Assignees, GithubResource.LabelsOnIssues],
+      [GithubResource.Assignees, ModifiedResourceMap.LabelsOnIssues],
       iteratee,
     );
   }
