@@ -210,8 +210,8 @@ export default class OrganizationAccountClient {
           [GithubResource.Collaborators],
           { login: this.login },
         );
-      console.log(`collabs are ${JSON.stringify(collaborators, null, 2)}`);
-      console.log(`repos are ${JSON.stringify(repositories, null, 2)}`);
+      //console.log(`collabs are ${JSON.stringify(collaborators, null, 2)}`);
+      //console.log(`repos are ${JSON.stringify(repositories, null, 2)}`);
       response = collaborators as Collaborator[];
       return rateLimitConsumed;
     });
